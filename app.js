@@ -3,11 +3,11 @@
 */
 
 var express = require('express')
-  , io = require('socket.io')
-  , http = require('http')
-  , twitter = require('ntwitter')
-  , _ = require('underscore')
-  , path = require('path');
+, io = require('socket.io')
+, http = require('http')
+, twitter = require('ntwitter')
+, _ = require('underscore')
+, path = require('path');
 
 // Create the express app
 var app = express();
@@ -21,10 +21,10 @@ var watchHashTags = ['cpbr7'];
 
 var watchList = {
   total: 0,
-  hashtag: ""
+  hashtags: {}
 };
 
-_.each(watchHashTags, function(v) { watchList.hashtag[v] = 0; });
+// _.each(watchHashTags, function(v) { watchList.hashtags[v] = 0; });
 
 // Express Setup
 
@@ -40,7 +40,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 //We're using bower components so add it to the path to make things easier
 app.use('/components', express.static(path.join(__dirname, 'components')));
- 
+
 // development only
 if ('development' == app.get('env')) {
   app.use(express.errorHandler());
@@ -48,22 +48,22 @@ if ('development' == app.get('env')) {
 
 //Our only route! Render it with the current watchList
 app.get('/', function(req, res) {
-    res.render('index', { data: watchList });
+  res.render('index', { data: watchList });
 });
 
 //Start a Socket.IO listen
 var sockets = io.listen(server);
- 
+
 //Set the sockets.io configuration.
 //THIS IS NECESSARY ONLY FOR HEROKU!
 // sockets.configure(function() {
 //   sockets.set('transports', ['xhr-polling']);
 //   sockets.set('polling duration', 10);
 // });
- 
+
 //If the client just connected, give them fresh data!
 sockets.sockets.on('connection', function(socket) { 
-    socket.emit('data', watchList);
+  socket.emit('data', watchList);
 });
 
 //Instantiate the twitter component
@@ -75,48 +75,53 @@ var t = new twitter({
     consumer_secret: process.env.TWITTER_CONS_SEC,        // <--- FILL ME IN
     access_token_key: process.env.TWITTER_ACC_KEY,       // <--- FILL ME IN
     access_token_secret: process.env.TWITTER_ACC_SEC     // <--- FILL ME IN
-});
- 
+  });
+
 //Tell the twitter API to filter on the watchSymbols 
 t.stream('statuses/filter', { track: watchHashTags }, function(stream) {
   stream.on('error', function(error, code) { console.log("My error: " + error + ": " + code); });
   //We have a connection. Now watch the 'data' event for incomming tweets.
   stream.on('data', function(tweet) {
- 
-    //This variable is used to indicate whether a symbol was actually mentioned.
-    //Since twitter doesnt why the tweet was forwarded we have to search through the text
-    //and determine which symbol it was ment for. Sometimes we can't tell, in which case we don't
-    //want to increment the total counter...
-    var claimed = false;
- 
+
     //Make sure it was a valid tweet
     if (tweet.text !== undefined) {
- 
+
       //We're gunna do some indexOf comparisons and we want it to be case agnostic.
       var text = tweet.text.toLowerCase();
- 
-      //Go through every symbol and see if it was mentioned. If so, increment its counter and
-      //set the 'claimed' variable to true to indicate something was mentioned so we can increment
-      //the 'total' counter!
-      _.each(watchHashTags, function(v) {
-          if (text.indexOf(v.toLowerCase()) !== -1) {
-              watchList.hashtags[v]++;
-              claimed = true;
-              console.log("#" + v + ": " + text);//JSON.stringify(tweet, null, 4));
-              console.log("Quantidade: " + watchList.hashtags[v]);
-          }
-      });
- 
-      //If something was mentioned, increment the total counter and send the update to all the clients
-      if (claimed) {
-          //Increment total
-          watchList.total++;
- 
+      var v = watchHashTags[0];
+      if (text.indexOf(v.toLowerCase()) !== -1) {
+        watchList.total++;
+        var regexp = new RegExp('#([^\\s]*)','g');
+        var allHashTags = text.match(regexp);
+              // Remove as tags cpbr7 e #cpbr7 para não contar novamente
+              a = allHashTags.indexOf(v);
+              console.log('a: ' + a);
+              b = allHashTags.indexOf('#' + v);
+              console.log('b: ' + b);
+              if (a > -1) { allHashTags.splice(a,1); }
+              if (b > -1) { allHashTags.splice(b,1); }
+              console.log(JSON.stringify(allHashTags,null,4));
+
+              _.each(allHashTags, function(v) {
+                watchList.hashtags[v] = ++watchList.hashtags[v] || 1;
+                setTimeout(function() { 
+                  watchList.hashtags[v]--;
+                  console.log('Diminuir Contagem: ' + v, JSON.stringify(watchList,null,4));
+                },1000*60*10);
+              });
+
+              console.log(JSON.stringify(watchList, null, 4));
+
+
+              // console.log("#" + v + ": " + text);//JSON.stringify(tweet, null, 4));
+              // console.log("Quantidade: " + watchList.hashtags[v]);
+            }
+
           //Send to all the clients
           sockets.sockets.emit('data', watchList);
-      }
-    }
-  });
+
+        }
+      });
 });
 
 //Create the server
