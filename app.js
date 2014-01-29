@@ -93,29 +93,36 @@ t.stream('statuses/filter', { track: watchHashTags }, function(stream) {
         watchList.total++;
         var regexp = new RegExp('#([^\\s]*)','g');
         var allHashTags = text.match(regexp);
-              // Remove as tags cpbr7 e #cpbr7 para não contar novamente
-              a = allHashTags.indexOf(v);
-              console.log('a: ' + a);
-              b = allHashTags.indexOf('#' + v);
-              console.log('b: ' + b);
-              if (a > -1) { allHashTags.splice(a,1); }
-              if (b > -1) { allHashTags.splice(b,1); }
-              console.log(JSON.stringify(allHashTags,null,4));
+        if (allHashTags) {
+                  // Remove as tags cpbr7 e #cpbr7 para não contar novamente
+                  console.log("valor de text: " + text);
+                  console.log("Valor de v: " + v);
+                  console.log("Valor de allHashTags: " + JSON.stringify(allHashTags,null,4));
+                  a = allHashTags.indexOf(v);
+                  console.log('a: ' + a);
+                  b = allHashTags.indexOf('#' + v);
+                  console.log('b: ' + b);
+                  if (a > -1) { allHashTags.splice(a,1); }
+                  if (b > -1) { allHashTags.splice(b,1); }
+                  console.log(JSON.stringify(allHashTags,null,4));
 
-              _.each(allHashTags, function(v) {
-                watchList.hashtags[v] = ++watchList.hashtags[v] || 1;
-                setTimeout(function() { 
-                  watchList.hashtags[v]--;
-                  console.log('Diminuir Contagem: ' + v, JSON.stringify(watchList,null,4));
-                },1000*60*10);
-              });
+                  _.each(allHashTags, function(v) {
+                    watchList.hashtags[v] = ++watchList.hashtags[v] || 1;
+                    var callbackTimer = function() { 
+                      watchList.hashtags[v]--;
+                      console.log('Diminuir Contagem: ' + v, JSON.stringify(watchList,null,4));
+                    };
+                    setTimeout(callbackTimer,1000*60*10);
+                  });
 
-              console.log(JSON.stringify(watchList, null, 4));
+                  console.log(JSON.stringify(watchList, null, 4));
+                }
 
 
-              // console.log("#" + v + ": " + text);//JSON.stringify(tweet, null, 4));
-              // console.log("Quantidade: " + watchList.hashtags[v]);
-            }
+
+        // console.log("#" + v + ": " + text);//JSON.stringify(tweet, null, 4));
+        // console.log("Quantidade: " + watchList.hashtags[v]);
+      }
 
           //Send to all the clients
           sockets.sockets.emit('data', watchList);
